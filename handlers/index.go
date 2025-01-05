@@ -31,8 +31,6 @@ func (h *ProfileHandler) ManageProfile(w http.ResponseWriter, r *http.Request) {
 		h.CreateProfile(w, r)
 	case "update_profile":
 		h.UpdateProfile(w, r)
-	case "delete_profile":
-		h.DeleteProfile(w, r)
 	case "update_profile_picture":
 		h.UpdateProfilePicture(w, r)
 	case "delete_profile_picture":
