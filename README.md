@@ -1,7 +1,9 @@
 ## Create_Profile Client Request Pattern 
 # Form-Data
 profile_picture : file
-```userinfo : {
+
+userinfo : 
+```{
   "name": "abhishek",
   "hobbies": ["singing"],
   "favorite_activities": ["playing valo", "dancing", "jumping"],
@@ -16,4 +18,5 @@ profile_picture : file
 }
 ```
 userid  : cosmosdx
+
 operation : create_profile
