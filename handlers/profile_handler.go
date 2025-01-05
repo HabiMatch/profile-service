@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"reflect"
 	"sync"
 
 	"github.com/HabiMatch/profile-service/models"
@@ -13,9 +14,6 @@ import (
 
 func (h *ProfileHandler) CreateProfile(w http.ResponseWriter, r *http.Request) {
 	f, fh, errs := r.FormFile("profile_picture")
-	println("File: ", f)
-	println("FileHeader: ", fh)
-	println("Errors: ", errs)
 	if errs != nil || f == nil || fh == nil {
 		return
 	}
@@ -125,52 +123,51 @@ func (h *ProfileHandler) CreateProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ProfileHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
+	userinfoRaw := r.FormValue("userinfo")
 	var input models.Profile
-	err := json.NewDecoder(r.Body).Decode(&input)
-	if err != nil {
-		http.Error(w, "failed to parse JSON", http.StatusBadRequest)
+
+	// Parse the JSON input
+	if err := json.Unmarshal([]byte(userinfoRaw), &input); err != nil {
+		http.Error(w, "Invalid JSON input", http.StatusBadRequest)
 		return
 	}
 
-	// Get the profile ID from the URL
-	profileID := r.FormValue("profile_id")
-	if profileID == "" {
-		http.Error(w, "profile_id is required", http.StatusBadRequest)
-		return
-	}
-
-	// Retrieve the profile from the database
+	// Fetch existing profile
 	var profile models.Profile
-	if result := h.DB.First(&profile, profileID); result.Error != nil {
-		http.Error(w, "failed to fetch profile", http.StatusInternalServerError)
+	if result := h.DB.First(&profile, "user_id = ?", input.UserID); result.Error != nil {
+		http.Error(w, "Profile not found", http.StatusNotFound)
 		return
 	}
 
-	// Update the profile with the new data
-	profile.Name = input.Name
-	profile.Smoking = input.Smoking
-	profile.Drinking = input.Drinking
-	profile.Cleanliness = input.Cleanliness
-	profile.WorkingHours = input.WorkingHours
-	profile.Hobbies = input.Hobbies
-	profile.FavoriteActivities = input.FavoriteActivities
-	profile.MusicPreferences = input.MusicPreferences
-	profile.GenderPreference = input.GenderPreference
-	profile.PetFriendly = input.PetFriendly
-	profile.FoodHabits = input.FoodHabits
-	profile.Location = input.Location
-	profile.Description = input.Description
+	inputValue := reflect.ValueOf(input)
+	profileValue := reflect.ValueOf(&profile).Elem()
+	inputType := inputValue.Type()
+
+	for i := 0; i < inputValue.NumField(); i++ {
+		fieldValue := inputValue.Field(i)
+		fieldType := inputType.Field(i)
+
+		// Skip zero (default) values for non-pointer fields
+		if fieldValue.Kind() == reflect.Ptr || !fieldValue.IsZero() {
+			profileField := profileValue.FieldByName(fieldType.Name)
+			if profileField.IsValid() && profileField.CanSet() {
+				profileField.Set(fieldValue)
+			}
+		}
+	}
 
 	// Save the updated profile
-	if result := h.DB.Save(&profile); result.Error != nil {
-		http.Error(w, "failed to update profile", http.StatusInternalServerError)
+	if err := h.DB.Save(&profile).Error; err != nil {
+		http.Error(w, "Failed to update profile", http.StatusInternalServerError)
 		return
 	}
 
+	// Respond with the updated profile
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(profile)
 }
 
+// DeleteProfile function is for server its not exposed to the client
 func (h *ProfileHandler) DeleteProfile(w http.ResponseWriter, r *http.Request) {
 	// Get the profile ID from the URL
 	profileID := r.FormValue("profile_id")
