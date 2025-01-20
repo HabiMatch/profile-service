@@ -22,29 +22,31 @@ func serializeProfileDetails(r *http.Request, pictureURL string) (models.Profile
 		}
 		input.UserID = r.FormValue("userid")
 	}
-	if input.Name == "" {
-		return models.Profile{}, 0, 0, fmt.Errorf("name is required")
+	if input.FirstName == "" {
+		return models.Profile{}, 0, 0, fmt.Errorf("FirstName is required")
 	}
 
-	if input.WorkingHours == nil {
-		input.WorkingHours = []byte("[]")
+	if input.LastName == "" {
+		return models.Profile{}, 0, 0, fmt.Errorf("LastName is required")
 	}
-	if input.Hobbies == nil {
-		input.Hobbies = []byte("[]")
+	if input.Selftags == nil {
+		input.Selftags = []string{}
 	}
-	if input.FavoriteActivities == nil {
-		input.FavoriteActivities = []byte("[]")
+	if input.Gender == false {
+		return models.Profile{}, 0, 0, fmt.Errorf("Gender is required")
 	}
-	if input.MusicPreferences == nil {
-		input.MusicPreferences = []byte("[]")
+	if input.Occupation == "" {
+		return models.Profile{}, 0, 0, fmt.Errorf("Occupation is required")
 	}
-	if input.GenderPreference == nil {
-		input.GenderPreference = []byte("[]")
+	if input.Address == "" {
+		return models.Profile{}, 0, 0, fmt.Errorf("Address is required")
 	}
-	if input.FoodHabits == nil {
-		input.FoodHabits = []byte("[]")
+	if input.Contactno == "" {
+		return models.Profile{}, 0, 0, fmt.Errorf("Contactno is required")
 	}
-
+	if input.Description == "" {
+		return models.Profile{}, 0, 0, fmt.Errorf("Description is required")
+	}
 	input.ProfilePicture = pictureURL
 	return input, input.Latitude, input.Longitude, nil
 }

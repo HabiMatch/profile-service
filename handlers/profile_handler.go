@@ -3,9 +3,11 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
-	"path/filepath"
+	"os"
 	"reflect"
+	"strings"
 	"sync"
 
 	"github.com/HabiMatch/profile-service/models"
@@ -30,12 +32,11 @@ func (h *ProfileHandler) CreateProfile(w http.ResponseWriter, r *http.Request) {
 		pictureURLChan = make(chan string)
 		geoReady       = make(chan struct{})
 	)
-
 	// Goroutine 1: Upload profile picture to S3
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		file, handler, err := r.FormFile("profile_picture")
+		file, _, err := r.FormFile("profile_picture")
 		if err != nil {
 			errChan <- fmt.Errorf("failed to upload profile picture: %v", err)
 			close(pictureURLChan)
@@ -44,20 +45,39 @@ func (h *ProfileHandler) CreateProfile(w http.ResponseWriter, r *http.Request) {
 		defer file.Close()
 
 		userID := r.FormValue("userid")
+		userID = strings.ReplaceAll(userID, " ", "")
 		if userID == "" {
 			errChan <- fmt.Errorf("userid is required")
 			close(pictureURLChan)
 			return
 		}
 
-		fileExt := filepath.Ext(handler.Filename)
-		if fileExt == "" {
-			errChan <- fmt.Errorf("file must have an extension")
+		// Verify if the file is an image
+		isImage, err := utils.IsImageFile(file)
+		if err != nil || !isImage {
+			errChan <- fmt.Errorf("uploaded file is not a valid image")
 			close(pictureURLChan)
 			return
 		}
-		fileName := fmt.Sprintf("profile_pictures/%s%s", userID, fileExt)
-		pictureURL, err := utils.UploadToS3(file, fileName)
+
+		// Reset file pointer to the start for processing
+		if _, err := file.Seek(0, io.SeekStart); err != nil {
+			errChan <- fmt.Errorf("failed to reset file pointer: %v", err)
+			close(pictureURLChan)
+			return
+		}
+
+		// Convert to JPEG
+		convertedFile, convertedFileName, err := utils.ConvertToJPEG(file, userID)
+		if err != nil {
+			errChan <- fmt.Errorf("failed to convert file to JPEG: %v", err)
+			close(pictureURLChan)
+			return
+		}
+		defer convertedFile.Close()
+
+		// Upload to S3
+		pictureURL, err := utils.UploadToS3(convertedFile, os.Getenv("S3_PROFILE_FOLDER_NAME"), convertedFileName)
 		if err != nil {
 			errChan <- fmt.Errorf("failed to upload to S3: %v", err)
 			close(pictureURLChan)
@@ -67,7 +87,6 @@ func (h *ProfileHandler) CreateProfile(w http.ResponseWriter, r *http.Request) {
 		pictureURLChan <- pictureURL // Send pictureURL to the channel
 		close(pictureURLChan)        // Close the channel after sending
 	}()
-
 	// Goroutine 2: Serialize profile details and store profile in the database
 	wg.Add(1)
 	go func() {

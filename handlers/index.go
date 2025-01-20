@@ -37,6 +37,19 @@ func (h *ProfileHandler) ManageProfile(w http.ResponseWriter, r *http.Request) {
 		h.DeleteProfilePicture(w, r)
 	case "update_geolocation":
 		h.UpdateGeolocation(w, r)
+	case "keeper_profile":
+		h.KeeperProfile(w, r)
+	case "update_keeper_profile":
+		h.UpdateKeeperProfile(w, r)
+	case "delete_keeper_profile":
+		h.DeleteKeeperProfile(w, r)
+	case "seeker_profile":
+		h.SeekerProfile(w, r)
+	case "update_seeker_profile":
+		h.UpdateSeekerProfile(w, r)
+	case "delete_seeker_profile":
+		h.DeleteSeekerProfile(w, r)
+
 	default:
 		http.Error(w, "Invalid operation", http.StatusBadRequest)
 		return
