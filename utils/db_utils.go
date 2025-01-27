@@ -33,7 +33,7 @@ func InitDB() (*gorm.DB, error) {
 	}
 
 	// Automatically migrate the models
-	err = db.AutoMigrate(&models.Profile{}, &models.Geolocation{})
+	err = db.AutoMigrate(&models.Profile{}, &models.Geolocation{}, &models.Keeper{}, &models.Seeker{})
 	if err != nil {
 		return nil, err
 	}

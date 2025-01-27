@@ -3,9 +3,11 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
-	"path/filepath"
+	"os"
 	"reflect"
+	"strings"
 	"sync"
 
 	"github.com/HabiMatch/profile-service/models"
@@ -15,6 +17,7 @@ import (
 func (h *ProfileHandler) CreateProfile(w http.ResponseWriter, r *http.Request) {
 	f, fh, errs := r.FormFile("profile_picture")
 	if errs != nil || f == nil || fh == nil {
+		http.Error(w, "Provide Profile Picture", http.StatusBadRequest)
 		return
 	}
 	err := r.ParseMultipartForm(10 << 20) // 10 MB
@@ -22,6 +25,20 @@ func (h *ProfileHandler) CreateProfile(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unable to parse form data", http.StatusBadRequest)
 		return
 	}
+	// Parse UserInfo
+	userinfoRaw := r.FormValue("userinfo")
+	var Profile models.Profile
+	erro := json.Unmarshal([]byte(userinfoRaw), &Profile)
+	if erro != nil {
+		fmt.Printf("Error parsing userinfo JSON: %v\n", err)
+		http.Error(w, "Unable to parse userinfo", http.StatusBadRequest)
+		return
+	}
+	if Profile.UserID == "" {
+		http.Error(w, "UserId is required", http.StatusBadRequest)
+		return
+	}
+
 	var (
 		profile        models.Profile
 		lat, lon       float64
@@ -30,12 +47,11 @@ func (h *ProfileHandler) CreateProfile(w http.ResponseWriter, r *http.Request) {
 		pictureURLChan = make(chan string)
 		geoReady       = make(chan struct{})
 	)
-
 	// Goroutine 1: Upload profile picture to S3
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		file, handler, err := r.FormFile("profile_picture")
+		file, _, err := r.FormFile("profile_picture")
 		if err != nil {
 			errChan <- fmt.Errorf("failed to upload profile picture: %v", err)
 			close(pictureURLChan)
@@ -43,21 +59,40 @@ func (h *ProfileHandler) CreateProfile(w http.ResponseWriter, r *http.Request) {
 		}
 		defer file.Close()
 
-		userID := r.FormValue("userid")
+		userID := Profile.UserID
+		userID = strings.ReplaceAll(userID, " ", "")
 		if userID == "" {
 			errChan <- fmt.Errorf("userid is required")
 			close(pictureURLChan)
 			return
 		}
 
-		fileExt := filepath.Ext(handler.Filename)
-		if fileExt == "" {
-			errChan <- fmt.Errorf("file must have an extension")
+		// Verify if the file is an image
+		isImage, err := utils.IsImageFile(file)
+		if err != nil || !isImage {
+			errChan <- fmt.Errorf("uploaded file is not a valid image")
 			close(pictureURLChan)
 			return
 		}
-		fileName := fmt.Sprintf("profile_pictures/%s%s", userID, fileExt)
-		pictureURL, err := utils.UploadToS3(file, fileName)
+
+		// Reset file pointer to the start for processing
+		if _, err := file.Seek(0, io.SeekStart); err != nil {
+			errChan <- fmt.Errorf("failed to reset file pointer: %v", err)
+			close(pictureURLChan)
+			return
+		}
+
+		// Convert to JPEG
+		convertedFile, convertedFileName, err := utils.ConvertToJPEG(file, userID)
+		if err != nil {
+			errChan <- fmt.Errorf("failed to convert file to JPEG: %v", err)
+			close(pictureURLChan)
+			return
+		}
+		defer convertedFile.Close()
+
+		// Upload to S3
+		pictureURL, err := utils.UploadToS3(convertedFile, os.Getenv("S3_PROFILE_FOLDER_NAME"), convertedFileName)
 		if err != nil {
 			errChan <- fmt.Errorf("failed to upload to S3: %v", err)
 			close(pictureURLChan)
@@ -67,7 +102,6 @@ func (h *ProfileHandler) CreateProfile(w http.ResponseWriter, r *http.Request) {
 		pictureURLChan <- pictureURL // Send pictureURL to the channel
 		close(pictureURLChan)        // Close the channel after sending
 	}()
-
 	// Goroutine 2: Serialize profile details and store profile in the database
 	wg.Add(1)
 	go func() {
@@ -77,7 +111,7 @@ func (h *ProfileHandler) CreateProfile(w http.ResponseWriter, r *http.Request) {
 			errChan <- fmt.Errorf("failed to receive pictureURL")
 			return
 		}
-		profile, lat, lon, err = serializeProfileDetails(r, pictureURL)
+		profile, lat, lon, err = serializeProfileDetails(Profile, pictureURL)
 		if err != nil {
 			errChan <- fmt.Errorf("failed to serialize profile details: %v", err)
 			return
@@ -85,6 +119,9 @@ func (h *ProfileHandler) CreateProfile(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("Parsed JSON profile: %+v\n", profile)
 		if result := h.DB.Create(&profile); result.Error != nil {
 			errChan <- fmt.Errorf("failed to create profile: %v", result.Error)
+			var temp []string
+			temp = append(temp, pictureURL)
+			cleanupUploadedImages(temp)
 			return
 		}
 
@@ -131,7 +168,10 @@ func (h *ProfileHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid JSON input", http.StatusBadRequest)
 		return
 	}
-
+	if input.UserID == "" {
+		http.Error(w, "UserId is required", http.StatusBadRequest)
+		return
+	}
 	// Fetch existing profile
 	var profile models.Profile
 	if result := h.DB.First(&profile, "user_id = ?", input.UserID); result.Error != nil {
@@ -170,9 +210,9 @@ func (h *ProfileHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 // DeleteProfile function is for server its not exposed to the client
 func (h *ProfileHandler) DeleteProfile(w http.ResponseWriter, r *http.Request) {
 	// Get the profile ID from the URL
-	profileID := r.FormValue("profile_id")
+	profileID := r.FormValue("user_id")
 	if profileID == "" {
-		http.Error(w, "profile_id is required", http.StatusBadRequest)
+		http.Error(w, "userid is required", http.StatusBadRequest)
 		return
 	}
 
