@@ -1,39 +1,30 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
+
+	"github.com/HabiMatch/profile-service/models"
+	"github.com/HabiMatch/profile-service/utils"
 )
 
 func (h *ProfileHandler) UpdateGeolocation(w http.ResponseWriter, r *http.Request) {
-	// profileID := r.FormValue("profile_id")
-	// if profileID == "" {
-	// 	http.Error(w, "Provide profile_id", http.StatusBadRequest)
-	// 	return
-	// }
+	userinfoRaw := r.FormValue("userinfo")
+	var input models.Geolocation
 
-	// latitude := r.FormValue("latitude")
-	// if latitude == "" {
-	// 	http.Error(w, "Provide latitude", http.StatusBadRequest)
-	// 	return
-	// }
-
-	// longitude := r.FormValue("longitude")
-	// if longitude == "" {
-	// 	http.Error(w, "Provide longitude", http.StatusBadRequest)
-	// 	return
-	// }
-
-	// profile := models.Profile{}
-	// if err := h.DB.Where("id = ?", profileID).First(&profile).Error; err != nil {
-	// 	http.Error(w, "Profile not found", http.StatusNotFound)
-	// 	return
-	// }
-
-	// profile.Latitude = latitude
-	// profile.Longitude = longitude
-
-	// if err := h.DB.Save(&profile).Error; err != nil {
-	// 	http.Error(w, "Error updating profile", http.StatusInternalServerError)
-	// 	return
-	// }
+	if err := json.Unmarshal([]byte(userinfoRaw), &input); err != nil {
+		http.Error(w, "Invalid JSON input", http.StatusBadRequest)
+		return
+	}
+	if input.UserID == "" {
+		http.Error(w, "Provide UserID", http.StatusBadRequest)
+		return
+	}
+	err := utils.UpdateGeolocation(h.DB, input.UserID, input.Latitude, input.Longitude)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	h.DB.Exec("UPDATE profiles SET latitude = ?, longitude = ?, updated_at = NOW() WHERE user_id = ?", input.Latitude, input.Longitude, input.UserID)
+	w.WriteHeader(http.StatusOK)
 }

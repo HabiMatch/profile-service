@@ -1,26 +1,15 @@
 package handlers
 
 import (
-	"encoding/json"
 	"fmt"
-	"net/http"
 
 	"github.com/HabiMatch/profile-service/models"
 )
 
-func serializeProfileDetails(r *http.Request, pictureURL string) (models.Profile, float64, float64, error) {
-	userinfoRaw := r.FormValue("userinfo")
-	var input models.Profile
-	err := json.Unmarshal([]byte(userinfoRaw), &input)
-	if err != nil {
-		fmt.Printf("Error parsing userinfo JSON: %v\n", err)
-		return models.Profile{}, 0, 0, err
-	}
+func serializeProfileDetails(input models.Profile, pictureURL string) (models.Profile, float64, float64, error) {
+
 	if input.UserID == "" {
-		if r.FormValue("userid") == "" {
-			return models.Profile{}, 0, 0, fmt.Errorf("userid is required")
-		}
-		input.UserID = r.FormValue("userid")
+		return models.Profile{}, 0, 0, fmt.Errorf("Userid is required")
 	}
 	if input.FirstName == "" {
 		return models.Profile{}, 0, 0, fmt.Errorf("FirstName is required")
@@ -32,7 +21,7 @@ func serializeProfileDetails(r *http.Request, pictureURL string) (models.Profile
 	if input.Selftags == nil {
 		input.Selftags = []string{}
 	}
-	if input.Gender == false {
+	if input.Gender == "" {
 		return models.Profile{}, 0, 0, fmt.Errorf("Gender is required")
 	}
 	if input.Occupation == "" {

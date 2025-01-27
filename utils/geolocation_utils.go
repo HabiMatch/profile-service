@@ -27,6 +27,28 @@ func StoreGeolocation(db *gorm.DB, userid string, latitude, longitude float64) e
 	return nil
 }
 
+func UpdateGeolocation(db *gorm.DB, userid string, newLatitude, newLongitude float64) error {
+	println("Updating geolocation for user: ", userid)
+	newLocation := fmt.Sprintf("POINT(%f %f)", newLongitude, newLatitude)
+	result := db.Model(&models.Geolocation{}).
+		Where("user_id = ?", userid).
+		Updates(models.Geolocation{
+			Location:  newLocation,
+			Latitude:  newLatitude,
+			Longitude: newLongitude,
+		})
+
+	if result.Error != nil {
+		log.Println("Failed to update geolocation:", result.Error)
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		log.Println("No record found for the given userid to update geolocation")
+		return fmt.Errorf("no record found for userid: %s", userid)
+	}
+	return nil
+}
+
 // (distance-based query).
 func GetProfilesWithinRadius(db *gorm.DB, latitude, longitude, radius float64) ([]models.Profile, error) {
 	query := `

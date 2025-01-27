@@ -33,8 +33,6 @@ func (h *ProfileHandler) ManageProfile(w http.ResponseWriter, r *http.Request) {
 		h.UpdateProfile(w, r)
 	case "update_profile_picture":
 		h.UpdateProfilePicture(w, r)
-	case "delete_profile_picture":
-		h.DeleteProfilePicture(w, r)
 	case "update_geolocation":
 		h.UpdateGeolocation(w, r)
 	case "keeper_profile":
