@@ -16,6 +16,7 @@ S3_REGION=ap-south-1
 S3_BUCKET_NAME=habimatch-profile
 S3_PROFILE_FOLDER_NAME=profile_pictures
 S3_ROOM_FOLDER_NAME=room_images
+ROOM_IMAGES_COUNT=3
 AWS_ACCESS_KEY=your_Access_key
 AWS_SECRET_KEY=your_Secret_key
 JWT_SECRET=your_jwt_secret
