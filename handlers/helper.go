@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/HabiMatch/profile-service/models"
+	"github.com/HabiMatch/profile-service/utils"
 )
 
 func serializeProfileDetails(input models.Profile, pictureURL string) (models.Profile, float64, float64, error) {
@@ -38,4 +39,29 @@ func serializeProfileDetails(input models.Profile, pictureURL string) (models.Pr
 	}
 	input.ProfilePicture = pictureURL
 	return input, input.Latitude, input.Longitude, nil
+}
+
+func cleanupUploadedImages(images []string) {
+	for _, image := range images {
+		err := utils.DeleteFromS3(image)
+		if err != nil {
+			fmt.Printf("Error removing image: %v\n", err)
+		}
+	}
+}
+
+func GetProfileType(profileType ProfileType) (interface{}, error) {
+	var input interface{}
+	switch profileType {
+	case KeeperProfileType:
+		input = &models.Keeper{}
+	case SeekerProfileType:
+		input = &models.Seeker{}
+	case GeneralProfileType:
+		input = &models.Profile{}
+	default:
+		return nil, fmt.Errorf("Invalid profile type")
+	}
+	return input, nil
+
 }
