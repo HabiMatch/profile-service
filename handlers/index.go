@@ -11,6 +11,12 @@ type ProfileHandler struct {
 	DB *gorm.DB
 }
 
+const (
+	KeeperProfileType ProfileType = iota
+	SeekerProfileType
+	GeneralProfileType
+)
+
 func (h *ProfileHandler) HelloWorld(w http.ResponseWriter, r *http.Request) {
 	hello := map[string]string{"hello": "world"}
 	w.Header().Set("Content-Type", "application/json")
@@ -28,25 +34,25 @@ func (h *ProfileHandler) ManageProfile(w http.ResponseWriter, r *http.Request) {
 	println("Operation: ", operation)
 	switch operation {
 	case "create_profile":
-		h.CreateProfile(w, r)
+		h.CreateProfileHandler(w, r, GeneralProfileType)
 	case "update_profile":
-		h.UpdateProfile(w, r)
+		h.UpdateProfileHandler(w, r, GeneralProfileType)
 	case "update_profile_picture":
 		h.UpdateProfilePicture(w, r)
 	case "update_geolocation":
 		h.UpdateGeolocation(w, r)
 	case "keeper_profile":
-		h.KeeperProfile(w, r)
+		h.CreateProfileHandler(w, r, KeeperProfileType)
 	case "update_keeper_profile":
-		h.UpdateKeeperProfile(w, r)
+		h.UpdateProfileHandler(w, r, KeeperProfileType)
 	case "delete_keeper_profile":
-		h.DeleteKeeperProfile(w, r)
+		h.DeleteProfileHandler(w, r, KeeperProfileType)
 	case "seeker_profile":
-		h.SeekerProfile(w, r)
+		h.CreateProfileHandler(w, r, SeekerProfileType)
 	case "update_seeker_profile":
-		h.UpdateSeekerProfile(w, r)
+		h.UpdateProfileHandler(w, r, SeekerProfileType)
 	case "delete_seeker_profile":
-		h.DeleteSeekerProfile(w, r)
+		h.DeleteProfileHandler(w, r, SeekerProfileType)
 
 	default:
 		http.Error(w, "Invalid operation", http.StatusBadRequest)

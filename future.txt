@@ -2,3 +2,8 @@
     in Keeper handler - code to upload and update new flat images with cleanup code of previous images
     update the backend logics such as - update profile and update keeper profile has same type of code but written twice or thrice 
 }
+
+
+{
+    in keeper profile creation if a user is sending to create a duplicate user its again uploading the images
+}

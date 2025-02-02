@@ -53,7 +53,6 @@ func UploadToS3(file multipart.File, folderName string, fileName string) (string
 	return url, nil
 }
 func DeleteFromS3(fileURL string) error {
-	print("----------------------- deleteFromS3 -----------------------")
 	println(fileURL)
 	s3Region := os.Getenv("S3_REGION")
 	s3Bucket := os.Getenv("S3_BUCKET_NAME")
